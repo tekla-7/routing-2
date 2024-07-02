@@ -1,15 +1,22 @@
-import { Form, useNavigate } from 'react-router-dom';
+import { Form, json, redirect, useActionData, useNavigate, useNavigation } from 'react-router-dom';
 
 import classes from './EventForm.module.css';
 
 function EventForm({ method, event }) {
+  const data=useActionData()
   const navigate = useNavigate();
+  const navigation=useNavigation();
+  const isSubmitting=navigation.state==='submitting'
+
   function cancelHandler() {
     navigate('..');
   }
 
   return (
-    <Form method='post' action='/any-other-path-name-wich we want' className={classes.form}>
+    <Form method={method} action='/any-other-path-name-wich we want' className={classes.form}>
+      {data && data.errors && <ul>
+        {Object.values(data.errors).mao(err=> <li key={err}>{err}</li>)}
+        </ul>}
       <p>
         <label htmlFor="title">Title</label>
         <input id="title" type="text" name="title" required defaultValue={event? event.title:''}/>
@@ -30,10 +37,42 @@ function EventForm({ method, event }) {
         <button type="button" onClick={cancelHandler}>
           Cancel
         </button>
-        <button>Save</button>
+        <button disabled={isSubmitting}>{isSubmitting ?'submitting...':'save'}</button>
       </div>
     </Form>
   );
 }
 
 export default EventForm;
+export async function action({request , params}){
+  const method=request.method
+  const data=request.formData();
+  
+  const eventData={
+      title:data.get('title'),
+      image:data.get('image'),
+      data:data.get('date'),
+      description:data.get('description')
+
+  }
+  let url="http://localhost:8080/events";
+  if(method==='PATCH'){
+    const eventId=params.eventId;
+    url="http://localhost:8080/events/"+eventId
+
+  }
+  const response=fetch(url,{
+      method:method,
+      headers:{
+          'Content-Type':'application/json'
+      },
+      body:JSON.stringify(eventData)
+  })
+  if(response.status===422){
+      return response
+  }
+  if(!response.ok){
+      throw json({message:'could not save event.' },{status:500})
+  }
+ return redirect('/events')
+}
